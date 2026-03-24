@@ -3566,50 +3566,185 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
 
       function demoSampleData() {
         const d = today();
+
+        // Build a realistic activity heatmap for the past 30 days
+        function isoOffset(daysAgo) {
+          const dt = new Date();
+          dt.setDate(dt.getDate() - daysAgo);
+          return dt.toISOString().split("T")[0];
+        }
+        const activity = {};
+        [
+          [0, 3],
+          [1, 2],
+          [2, 0],
+          [3, 4],
+          [4, 1],
+          [5, 0],
+          [6, 0],
+          [7, 5],
+          [8, 2],
+          [9, 3],
+          [10, 0],
+          [11, 1],
+          [12, 4],
+          [13, 2],
+          [14, 0],
+          [15, 3],
+          [16, 2],
+          [17, 0],
+          [18, 6],
+          [19, 1],
+          [20, 2],
+          [21, 0],
+          [22, 3],
+          [23, 1],
+          [24, 4],
+          [25, 0],
+          [26, 2],
+          [27, 3],
+          [28, 1],
+          [29, 2],
+        ].forEach(([ago, count]) => {
+          if (count > 0) activity[isoOffset(ago)] = count;
+        });
+
+        function daysAgoStr(n) {
+          const dt = new Date();
+          dt.setDate(dt.getDate() - n);
+          return dt.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+        }
+
         return {
           meta: { lastUpdated: d },
           columns: defaultCols(),
-          companies: [],
-          events: [],
           monthlySummaries: [],
-          stories: [],
-          storyQuestions: [],
-          storiesCompanyOrder: [],
-          activity: {},
+          activity,
+          events: [],
+          storiesCompanyOrder: ["Vandelay Industries", "Umbrella Corp"],
+
+          companies: [
+            {
+              id: "codemo1",
+              name: "Vandelay Industries",
+              linkedinUrl: "",
+              contact: "",
+            },
+            {
+              id: "codemo2",
+              name: "Initech",
+              linkedinUrl: "",
+              contact: "bill.lumbergh@initech.com",
+            },
+            {
+              id: "codemo3",
+              name: "Umbrella Corp",
+              linkedinUrl: "",
+              contact: "",
+            },
+            {
+              id: "codemo4",
+              name: "Globodyne",
+              linkedinUrl: "",
+              contact: "j.belfort@globodyne.com",
+            },
+            { id: "codemo5", name: "Acme Corp", linkedinUrl: "", contact: "" },
+          ],
+
+          storyQuestions: [
+            {
+              id: "sq1",
+              text: "Tell me about a time you had to make a difficult product decision with limited data.",
+            },
+            {
+              id: "sq2",
+              text: "Describe a situation where you had to align stakeholders who disagreed.",
+            },
+            {
+              id: "sq3",
+              text: "Tell me about a project that didn't go as planned. What did you do?",
+            },
+            {
+              id: "sq4",
+              text: "Give an example of a time you advocated for the user against internal pressure.",
+            },
+          ],
+
+          stories: [
+            {
+              id: "st1",
+              title: "Killed a feature users loved but couldn't support",
+              situation:
+                "Our team had shipped a real-time collaboration feature that had strong NPS scores, but was causing 40% of our on-call incidents. Engineering wanted to remove it; users were pushing back hard.",
+              task: "Decide whether to keep the feature, fix it, or cut it — and get buy-in from both engineering and the executive team.",
+              action:
+                "I pulled usage data and found that only 8% of users used it weekly despite high satisfaction scores. I ran a quick survey to understand what need it was actually solving, then designed a lightweight async alternative that addressed the core use case. I presented both the data and the proposed replacement to leadership before announcing anything to users.",
+              result:
+                "Leadership approved the migration. We sunset the feature with a 90-day notice and shipped the replacement on time. Incident rate dropped 35%. Two users emailed to say they actually preferred the new version.",
+              questions: ["sq1", "sq4"],
+            },
+            {
+              id: "st2",
+              title:
+                "Aligned sales, engineering, and design on a pricing change",
+              situation:
+                "We were redesigning our pricing page ahead of a rebrand. Sales wanted to hide pricing entirely, engineering wanted a simple static page, and design had a complex interactive concept that would take 6 weeks.",
+              task: "Get all three teams to agree on a direction so we could ship before the rebrand launch deadline.",
+              action:
+                "I set up a 90-minute working session and started by having each team articulate what a bad outcome would look like — not what they wanted, but what they feared. That reframed the conversation. We found the real constraints: sales needed one thing to be above the fold, engineering needed it done in two weeks. I sketched three options live in the meeting and we dot-voted. Everyone left with something.",
+              result:
+                "Shipped on time. The page we built was closer to engineering's simple version, but with the one element sales needed. Conversion on the pricing page went up 12% in the first month.",
+              questions: ["sq2"],
+            },
+            {
+              id: "st3",
+              title: "Recovered a late project by cutting scope ruthlessly",
+              situation:
+                "Six weeks before launch, our onboarding redesign was 60% done and the team was burning out. The original scope included five new flows, an onboarding checklist, tooltips, and an email sequence.",
+              task: "Figure out what to cut without tanking the business outcome, and re-motivate the team.",
+              action:
+                "I went back to the original goal — reduce time-to-first-value. I mapped each piece of scope to that metric and found two flows were responsible for 80% of the projected improvement. I presented a cut scope to the PM and got sign-off in one conversation. Then I held a team retro to name what was wrong before moving forward.",
+              result:
+                "We shipped the two core flows on the original date. Time-to-first-value dropped by 28%. The three cut items were scheduled for the next quarter, and one was eventually dropped because data showed it wasn't needed.",
+              questions: ["sq3", "sq1"],
+            },
+          ],
+
           applications: [
             {
               id: "cdemo1",
-              status: "recruiter",
-              company: "Acme Corp",
-              role: "Senior Product Designer",
-              salary: "$140,000",
+              status: "feeling",
+              company: "Globodyne",
+              role: "Design Lead",
+              salary: "",
               bonus: "",
               equity: "",
-              source: "LinkedIn",
+              source: "Inbound",
               link: "",
               linkedinUrl: "",
-              startDate: d,
+              startDate: daysAgoStr(12),
               steps: [],
               notes: [
                 {
-                  id: "n1",
-                  text: "Intro call with recruiter went well",
+                  id: "n0a",
+                  text: "Recruiter reached out on LinkedIn. Role looks interesting.",
                   indent: 0,
-                  date: d,
+                  date: daysAgoStr(12),
                 },
                 {
-                  id: "n2",
-                  text: "Hiring manager interview scheduled for next week",
-                  indent: 0,
-                  date: d,
+                  id: "n0b",
+                  text: "Asked about team size and eng-to-designer ratio",
+                  indent: 1,
+                  date: daysAgoStr(10),
                 },
               ],
               jobDescription: "",
               resources: "",
-              statusHistory: [
-                { from: "feeling", to: "applied", date: d },
-                { from: "applied", to: "recruiter", date: d },
-              ],
+              statusHistory: [],
               contacts: [],
             },
             {
@@ -3623,38 +3758,199 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
               source: "Referral",
               link: "",
               linkedinUrl: "",
-              startDate: d,
+              startDate: daysAgoStr(18),
               steps: [],
               notes: [
                 {
-                  id: "n3",
-                  text: "Referred by a former colleague",
+                  id: "n1a",
+                  text: "Referred by former colleague Dana — she said the team is small but well-respected internally",
                   indent: 0,
-                  date: d,
+                  date: daysAgoStr(18),
+                },
+                {
+                  id: "n1b",
+                  text: "Submitted application. Tailored cover letter around their B2B focus.",
+                  indent: 0,
+                  date: daysAgoStr(16),
+                },
+                {
+                  id: "n1c",
+                  text: "No response yet — follow up with Dana next week if nothing by Friday",
+                  indent: 0,
+                  date: daysAgoStr(9),
                 },
               ],
               jobDescription: "",
               resources: "",
-              statusHistory: [{ from: "feeling", to: "applied", date: d }],
+              statusHistory: [
+                { from: "feeling", to: "applied", date: daysAgoStr(16) },
+              ],
               contacts: [],
             },
             {
               id: "cdemo3",
-              status: "feeling",
-              company: "Globodyne",
-              role: "Design Lead",
-              salary: "",
+              status: "recruiter",
+              company: "Acme Corp",
+              role: "Senior Product Designer",
+              salary: "$140,000",
               bonus: "",
               equity: "",
+              source: "LinkedIn",
+              link: "",
+              linkedinUrl: "",
+              startDate: daysAgoStr(21),
+              steps: ["Recruiter screen"],
+              notes: [
+                {
+                  id: "n2a",
+                  text: "Applied cold. Job post mentioned design systems work which is a fit.",
+                  indent: 0,
+                  date: daysAgoStr(21),
+                },
+                {
+                  id: "n2b",
+                  text: "Recruiter screen with Priya — 30 min, mostly background. She mentioned the role is new and reports to CPO.",
+                  indent: 0,
+                  date: daysAgoStr(14),
+                },
+                {
+                  id: "n2c",
+                  text: "Good signal on comp — said band goes up to $155k",
+                  indent: 1,
+                  date: daysAgoStr(14),
+                },
+                {
+                  id: "n2d",
+                  text: "Hiring manager interview scheduled for next Tuesday",
+                  indent: 0,
+                  date: daysAgoStr(7),
+                },
+              ],
+              jobDescription: "",
+              resources: "",
+              statusHistory: [
+                { from: "feeling", to: "applied", date: daysAgoStr(21) },
+                { from: "applied", to: "recruiter", date: daysAgoStr(14) },
+              ],
+              contacts: [],
+            },
+            {
+              id: "cdemo4",
+              status: "hiring",
+              company: "Vandelay Industries",
+              role: "Principal Designer",
+              salary: "$175,000",
+              bonus: "15%",
+              equity: "0.2%",
+              source: "Referral",
+              link: "",
+              linkedinUrl: "",
+              startDate: daysAgoStr(28),
+              steps: ["Recruiter screen", "Hiring manager interview"],
+              notes: [
+                {
+                  id: "n3a",
+                  text: "Intro from Marcus — he said the hiring manager is great but process moves slowly",
+                  indent: 0,
+                  date: daysAgoStr(28),
+                },
+                {
+                  id: "n3b",
+                  text: "Recruiter screen with Jess — fast, mostly logistics. She confirmed TC is flexible.",
+                  indent: 0,
+                  date: daysAgoStr(22),
+                },
+                {
+                  id: "n3c",
+                  text: "HM interview with Rodrigo — 1 hour, went deep on systems thinking and cross-functional influence",
+                  indent: 0,
+                  date: daysAgoStr(12),
+                },
+                {
+                  id: "n3d",
+                  text: "He asked about a time I pushed back on a PM decision — used the Umbrella Corp pricing story",
+                  indent: 1,
+                  date: daysAgoStr(12),
+                },
+                {
+                  id: "n3e",
+                  text: "Felt strong. He said next step is a portfolio review with the broader design team.",
+                  indent: 0,
+                  date: daysAgoStr(11),
+                },
+              ],
+              jobDescription: "",
+              resources: "",
+              statusHistory: [
+                { from: "feeling", to: "applied", date: daysAgoStr(28) },
+                { from: "applied", to: "recruiter", date: daysAgoStr(22) },
+                { from: "recruiter", to: "hiring", date: daysAgoStr(12) },
+              ],
+              contacts: [],
+            },
+            {
+              id: "cdemo5",
+              status: "written",
+              company: "Umbrella Corp",
+              role: "Design Director",
+              salary: "$195,000",
+              bonus: "20%",
+              equity: "0.5%",
               source: "Inbound",
               link: "",
               linkedinUrl: "",
-              startDate: d,
-              steps: [],
-              notes: [],
+              startDate: daysAgoStr(35),
+              steps: [
+                "Recruiter screen",
+                "Hiring manager interview",
+                "Written exercise",
+              ],
+              notes: [
+                {
+                  id: "n4a",
+                  text: "They reached out. Role is a new function — first design director hire.",
+                  indent: 0,
+                  date: daysAgoStr(35),
+                },
+                {
+                  id: "n4b",
+                  text: "Recruiter screen with Jordan — standard. Said they move fast.",
+                  indent: 0,
+                  date: daysAgoStr(28),
+                },
+                {
+                  id: "n4c",
+                  text: "HM interview — 90 min with the CPO. Lots of questions about org building and hiring.",
+                  indent: 0,
+                  date: daysAgoStr(19),
+                },
+                {
+                  id: "n4d",
+                  text: "Written exercise assigned: redesign the user onboarding flow. 1 week turnaround.",
+                  indent: 0,
+                  date: daysAgoStr(12),
+                },
+                {
+                  id: "n4e",
+                  text: "Submitted take-home. Led with metrics, showed 3 concepts, recommended one clearly.",
+                  indent: 0,
+                  date: daysAgoStr(5),
+                },
+                {
+                  id: "n4f",
+                  text: "Waiting on feedback — Jordan said 3–5 business days",
+                  indent: 0,
+                  date: daysAgoStr(4),
+                },
+              ],
               jobDescription: "",
               resources: "",
-              statusHistory: [],
+              statusHistory: [
+                { from: "feeling", to: "applied", date: daysAgoStr(35) },
+                { from: "applied", to: "recruiter", date: daysAgoStr(28) },
+                { from: "recruiter", to: "hiring", date: daysAgoStr(19) },
+                { from: "hiring", to: "written", date: daysAgoStr(12) },
+              ],
               contacts: [],
             },
           ],
