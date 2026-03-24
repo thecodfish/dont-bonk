@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Job Search</title>
+    <title>Don't Bonk</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap"
@@ -76,6 +76,22 @@
         color: var(--text);
         letter-spacing: -0.02em;
       }
+      .app-title-link {
+        color: inherit;
+        text-decoration: none;
+      }
+      @keyframes rainbow {
+        0%   { color: #f87171; }
+        16%  { color: #fbbf24; }
+        33%  { color: #4ade80; }
+        50%  { color: #60a5fa; }
+        66%  { color: #a78bfa; }
+        83%  { color: #f472b6; }
+        100% { color: #f87171; }
+      }
+      .app-title-link:hover .bonk-word {
+        animation: rainbow 1.2s linear infinite;
+      }
       .app-subtitle {
         font-size: 12px;
         color: var(--text3);
@@ -99,6 +115,46 @@
         font-size: 11px;
         color: var(--text3);
         margin-top: 2px;
+      }
+      /* ── Quote bar ── */
+      .quote-bar {
+        padding: 8px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      .quote-bar:hover {
+        background: var(--surface2);
+      }
+      .quote-text {
+        font-family: var(--sans);
+        font-size: 12px;
+        font-style: italic;
+        color: var(--text2);
+      }
+      .quote-icon {
+        font-family: var(--serif, Georgia, serif);
+        font-size: 14px;
+        color: var(--text3);
+        line-height: 1;
+        user-select: none;
+      }
+      .quote-input {
+        background: none;
+        border: none;
+        outline: none;
+        font-family: var(--sans);
+        font-size: 12px;
+        font-style: italic;
+        color: var(--text);
+        width: 60ch;
+        max-width: 80vw;
+        text-align: center;
+        padding: 0;
       }
 
       /* ── Board ── */
@@ -3060,7 +3116,15 @@
 
     <div class="header">
       <div class="header-left">
-        <div class="app-title">job-search /</div>
+        <div class="app-title">
+          <a
+            href="https://en.wikipedia.org/wiki/Hitting_the_wall"
+            target="_blank"
+            rel="noopener"
+            class="app-title-link"
+            >Don't <span class="bonk-word">Bonk</span></
+          >
+        </div>
         <div class="app-subtitle" id="last-updated"></div>
       </div>
       <div style="display: flex; align-items: center; gap: 16px">
@@ -3099,6 +3163,17 @@
           ✦
         </button>
       </div>
+    </div>
+
+    <div
+      class="quote-bar"
+      id="quote-bar"
+      onclick="startEditQuote()"
+      title="Click to edit"
+    >
+      <span class="quote-icon">"</span>
+      <span class="quote-text" id="quote-display"></span>
+      <span class="quote-icon">"</span>
     </div>
 
     <div class="view-tabs">
@@ -3721,6 +3796,9 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             } catch (e) {}
           }
         }
+        if (!state.quote)
+          state.quote =
+            "The single most important thing to manage during a job search is your mood.";
         if (!state.companies) state.companies = [];
         if (!state.events) state.events = [];
         if (!state.monthlySummaries) state.monthlySummaries = [];
@@ -3810,11 +3888,55 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       // ── Render ────────────────────────────────────────────
       function render() {
         renderHeader();
+        renderQuote();
         renderBoard();
         renderArchive();
         renderCompanies();
         renderTodos();
         renderActivity();
+      }
+
+      function renderQuote() {
+        const el = document.getElementById("quote-display");
+        if (el) el.textContent = state.quote || "";
+      }
+
+      function startEditQuote() {
+        const bar = document.getElementById("quote-bar");
+        const display = document.getElementById("quote-display");
+        if (!bar || !display) return;
+        // Replace span with input
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "quote-input";
+        input.value = state.quote || "";
+        bar.replaceChild(input, display);
+        bar.onclick = null;
+        input.focus();
+        input.select();
+        async function finishEdit() {
+          const val = input.value.trim();
+          if (val !== state.quote) {
+            state.quote =
+              val ||
+              "The single most important thing to manage during a job search is your mood.";
+            await saveState();
+          }
+          const span = document.createElement("span");
+          span.className = "quote-text";
+          span.id = "quote-display";
+          span.textContent = state.quote;
+          bar.replaceChild(span, input);
+          bar.onclick = () => startEditQuote();
+        }
+        input.addEventListener("blur", finishEdit);
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") input.blur();
+          if (e.key === "Escape") {
+            input.value = state.quote;
+            input.blur();
+          }
+        });
       }
 
       function renderHeader() {
