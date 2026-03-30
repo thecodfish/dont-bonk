@@ -81,13 +81,27 @@
         text-decoration: none;
       }
       @keyframes rainbow {
-        0%   { color: #f87171; }
-        16%  { color: #fbbf24; }
-        33%  { color: #4ade80; }
-        50%  { color: #60a5fa; }
-        66%  { color: #a78bfa; }
-        83%  { color: #f472b6; }
-        100% { color: #f87171; }
+        0% {
+          color: #f87171;
+        }
+        16% {
+          color: #fbbf24;
+        }
+        33% {
+          color: #4ade80;
+        }
+        50% {
+          color: #60a5fa;
+        }
+        66% {
+          color: #a78bfa;
+        }
+        83% {
+          color: #f472b6;
+        }
+        100% {
+          color: #f87171;
+        }
       }
       .app-title-link:hover .bonk-word {
         animation: rainbow 1.2s linear infinite;
@@ -3941,10 +3955,8 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
 
       function renderHeader() {
         const apps = state.applications;
-        const total = apps.length;
-        const active = apps.filter(
-          (a) => !["feeling", "rejected"].includes(a.status),
-        ).length;
+        const total = apps.length + (state.companies || []).length;
+        const active = (state.companies || []).length;
         const offers = apps.filter((a) => a.status === "offer").length;
 
         document.getElementById("header-stats").innerHTML = `
