@@ -750,7 +750,7 @@
       }
       .outliner-line {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         gap: 5px;
         min-height: 26px;
       }
@@ -761,6 +761,7 @@
         width: 12px;
         text-align: center;
         user-select: none;
+        margin-top: 4px;
       }
       .outliner-input {
         flex: 1;
@@ -773,6 +774,9 @@
         padding: 1px 0;
         line-height: 1.5;
         min-width: 0;
+        resize: none;
+        overflow: hidden;
+        word-wrap: break-word;
       }
       .outliner-input::placeholder {
         color: var(--text3);
@@ -4645,23 +4649,34 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             bullet.className = "outliner-bullet";
             bullet.textContent = "•";
 
-            const input = document.createElement("input");
+            const input = document.createElement("textarea");
             input.className = "outliner-input";
             input.value = line.text;
+            input.rows = 1;
             if (i === 0 && lines.length === 1 && !line.text)
               input.placeholder = "Type a note…";
 
+            function resizeInput() {
+              input.style.height = "auto";
+              input.style.height = input.scrollHeight + "px";
+            }
+
             input.addEventListener("input", () => {
               lines[i].text = input.value;
+              resizeInput();
               saveLines();
             });
 
             input.addEventListener("keydown", (e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
+                const cursor = input.selectionStart;
+                const before = input.value.slice(0, cursor);
+                const after = input.value.slice(cursor);
+                lines[i].text = before;
                 const newLine = {
                   id: uid(),
-                  text: "",
+                  text: after,
                   indent: line.indent,
                   date: line.indent === 0 ? today() : "",
                   ...(line.indent === 0
@@ -4778,6 +4793,12 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             }
 
             container.appendChild(wrapper);
+          });
+
+          // Resize all textareas to fit their content
+          container.querySelectorAll(".outliner-input").forEach((ta) => {
+            ta.style.height = "auto";
+            ta.style.height = ta.scrollHeight + "px";
           });
 
           if (focusIdx !== undefined) {
