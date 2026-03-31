@@ -1754,6 +1754,103 @@
         color: var(--red);
         background: var(--red-dim);
       }
+      .co-careers-link {
+        font-size: 11px;
+        color: var(--green);
+        font-family: var(--mono);
+        text-decoration: none;
+        opacity: 0.7;
+      }
+      .co-careers-link:hover {
+        opacity: 1;
+        text-decoration: underline;
+      }
+      .co-row-actions {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        justify-content: flex-end;
+      }
+      .co-move-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text3);
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: var(--radius);
+        transition: all 0.15s;
+        opacity: 0;
+        white-space: nowrap;
+      }
+      .co-row:hover .co-move-btn {
+        opacity: 1;
+      }
+      .co-move-btn:hover {
+        color: var(--green);
+        background: var(--green-dim);
+      }
+      .co-archive-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text3);
+        font-family: var(--mono);
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: var(--radius);
+        transition: all 0.15s;
+        opacity: 0;
+        white-space: nowrap;
+      }
+      .co-row:hover .co-archive-btn {
+        opacity: 1;
+      }
+      .co-archive-btn:hover {
+        color: #f97316;
+        background: rgba(249, 115, 22, 0.12);
+      }
+      @keyframes coHighlightPulse {
+        0% {
+          background: rgba(124, 106, 247, 0.3);
+        }
+        100% {
+          background: transparent;
+        }
+      }
+      .co-row.highlight-pulse {
+        animation: coHighlightPulse 1.6s ease-out forwards;
+      }
+      .filter-toggle.active-green {
+        background: var(--green-dim);
+        color: var(--green);
+        border-color: rgba(74, 222, 128, 0.3);
+      }
+      .co-add-contact-wrap {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .co-add-contact-input {
+        font-size: 11px;
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text2);
+        font-family: var(--mono);
+        padding: 4px 10px;
+        border-radius: var(--radius);
+        transition: all 0.15s;
+        width: 170px;
+      }
+      .co-add-contact-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .co-add-contact-input::placeholder {
+        color: var(--text3);
+      }
       .co-empty-state {
         padding: 48px 0;
         text-align: center;
@@ -3287,6 +3384,8 @@
           type="text"
           placeholder="https://www.linkedin.com/company/..."
         />
+        <label>Careers page (optional)</label>
+        <input id="ac-careers" type="text" placeholder="https://..." />
         <label>Contact (optional)</label>
         <input
           id="ac-contact"
@@ -3297,6 +3396,38 @@
           <button class="btn" onclick="closeAddCoModal()">cancel</button>
           <button class="btn btn-primary" onclick="saveNewCompany()">
             add →
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Archive Company Modal -->
+    <div
+      class="modal-overlay"
+      id="archive-co-modal-overlay"
+      onclick="handleArchiveCoModalClick(event)"
+    >
+      <div class="modal">
+        <h3>// not a fit</h3>
+        <label>Why isn't this a fit? (optional)</label>
+        <textarea
+          id="archive-co-note"
+          placeholder="e.g. too early stage, wrong domain, comp too low…"
+          rows="3"
+          style="resize: vertical"
+        ></textarea>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeArchiveCoModal()">cancel</button>
+          <button
+            class="btn btn-primary"
+            onclick="confirmArchiveCompany()"
+            style="
+              background: rgba(249, 115, 22, 0.15);
+              color: #f97316;
+              border-color: rgba(249, 115, 22, 0.3);
+            "
+          >
+            archive 🔥
           </button>
         </div>
       </div>
@@ -3621,7 +3752,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       let addingToCol = null;
       let dragId = null;
       let dragFrom = null;
-      let coFilterNoContact = false;
+      let coContactFilter = ""; // '' | 'needs-intro' | 'has-contact'
       let dragSourceType = null; // 'board' | 'pipeline'
       let archiveExpanded = false;
 
@@ -4071,10 +4202,16 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             ? `<div class="card-img">${app.image}</div>`
             : "";
 
+        const careersLinkHtml =
+          app.status === "feeling" && app.careersUrl
+            ? `<a class="co-careers-link" href="${app.careersUrl}" target="_blank" rel="noopener" style="margin-top:3px;display:inline-block;" onclick="event.stopPropagation()">↗ careers</a>`
+            : "";
+
         el.innerHTML = `
     ${imgHtml}
     <div class="card-co">${app.company}</div>
     <div class="card-role">${app.role}</div>
+    ${careersLinkHtml}
     ${tagHtml || salHtml ? `<div class="card-tags">${tagHtml}${salHtml}</div>` : ""}
     ${dotsHtml}
   `;
@@ -4149,6 +4286,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           source: "",
           link: "",
           linkedinUrl: co.linkedinUrl || "",
+          careersUrl: co.careersUrl || "",
           startDate: today(),
           steps: [],
           notes: [],
@@ -4357,6 +4495,11 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           </select>
           <span class="field-key">job link</span>
           <input class="field-input" value="${app.link || ""}" placeholder="https://..." onchange="updateField('${app.id}','link',this.value)" />
+          <span class="field-key">careers page</span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input class="field-input" style="flex:1;" value="${app.careersUrl || ""}" placeholder="https://..." onchange="updateField('${app.id}','careersUrl',this.value)" />
+            ${app.careersUrl ? `<a href="${app.careersUrl}" target="_blank" rel="noopener" style="color:var(--green);font-family:var(--mono);font-size:13px;text-decoration:none;flex-shrink:0;" title="${app.careersUrl}">↗</a>` : ""}
+          </div>
         </div>
       </div>
 
@@ -4746,6 +4889,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           closeModal();
           closeShareModal();
           closeAddCoModal();
+          closeArchiveCoModal();
         }
       });
 
@@ -4753,15 +4897,23 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       function renderCompanies() {
         const companies = state.companies || [];
         const noContactCount = companies.filter((c) => !c.contact).length;
-        const filtered = coFilterNoContact
-          ? companies.filter((c) => !c.contact)
-          : companies;
+        const sorted = [...companies].sort((a, b) =>
+          (a.name || "")
+            .toLowerCase()
+            .localeCompare((b.name || "").toLowerCase()),
+        );
+        const filtered =
+          coContactFilter === "needs-intro"
+            ? sorted.filter((c) => !c.contact)
+            : coContactFilter === "has-contact"
+              ? sorted.filter((c) => c.contact)
+              : sorted;
         const view = document.getElementById("companies-view");
 
         const rows = filtered
           .map(
             (c) => `
-    <tr class="co-row" draggable="true"
+    <tr class="co-row" data-co-id="${c.id}" draggable="true"
         onclick="openEditCoModal('${c.id}')"
         ondragstart="pipelineDragStart(event,'${c.id}')"
         ondragend="pipelineDragEnd(event)">
@@ -4769,11 +4921,18 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       <td>
         <div class="co-name-cell">
           <span class="co-name">${c.name}</span>
-          ${
-            c.linkedinUrl
-              ? `<a class="co-linkedin-link" href="${c.linkedinUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗ linkedin</a>`
-              : `<span class="co-no-link">no linkedin</span>`
-          }
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            ${
+              c.linkedinUrl
+                ? `<a class="co-linkedin-link" href="${c.linkedinUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗ linkedin</a>`
+                : `<span class="co-no-link">no linkedin</span>`
+            }
+            ${
+              c.careersUrl
+                ? `<a class="co-careers-link" href="${c.careersUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗ careers</a>`
+                : ""
+            }
+          </div>
         </div>
       </td>
       <td>
@@ -4801,12 +4960,19 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           : '<span style="font-size:11px;font-family:var(--mono);color:var(--text3)">—</span>';
       })()}</td>
       <td style="text-align:right;">
-        <button class="co-del-btn" onclick="event.stopPropagation();deleteCompany('${c.id}')">remove</button>
+        <div class="co-row-actions">
+          <button class="co-move-btn" onclick="event.stopPropagation();moveCompanyToFeeling('${c.id}')" title="Move to feeling things out">→ feeling</button>
+          <button class="co-archive-btn" onclick="event.stopPropagation();openArchiveCoModal('${c.id}')" title="Not a fit">not a fit 🔥</button>
+          <button class="co-del-btn" onclick="event.stopPropagation();deleteCompany('${c.id}')">remove</button>
+        </div>
       </td>
     </tr>
   `,
           )
           .join("");
+
+        const filterNeedsIntroActive = coContactFilter === "needs-intro";
+        const filterHasContactActive = coContactFilter === "has-contact";
 
         view.innerHTML = `
     <div class="pipeline-head">
@@ -4817,12 +4983,18 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             ${companies.length} compan${companies.length === 1 ? "y" : "ies"}${noContactCount > 0 ? `<span style="color:var(--amber);"> · ${noContactCount} need intro</span>` : ""}
           </span>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="filter-toggle${coFilterNoContact ? " active" : ""}" onclick="toggleCoFilter()">
-            ${coFilterNoContact ? "✕ needs intro" : "needs intro"}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <button class="filter-toggle${filterNeedsIntroActive ? " active" : ""}" onclick="setCoFilter('needs-intro')">
+            ${filterNeedsIntroActive ? "✕ needs intro" : "needs intro"}
+          </button>
+          <button class="filter-toggle${filterHasContactActive ? " active-green" : ""}" onclick="setCoFilter('has-contact')">
+            ${filterHasContactActive ? "✕ has contact" : "has contact"}
           </button>
           <button class="btn btn-primary" onclick="openShareModal()" ${noContactCount === 0 ? 'disabled style="opacity:0.4;cursor:default;"' : ""}>share →</button>
           <button class="btn" onclick="openAddCoModal()">+ add company</button>
+          <div class="co-add-contact-wrap">
+            <input class="co-add-contact-input" id="co-add-contact-input" placeholder="add by contact…" onkeydown="if(event.key==='Enter'){addCompanyByContact(this.value);this.value='';}" onclick="event.stopPropagation()" />
+          </div>
         </div>
       </div>
     </div>
@@ -4831,7 +5003,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       filtered.length === 0
         ? `
       <div class="co-empty-state">
-        ${companies.length === 0 ? "no companies yet — add some to start building your pipeline" : "no companies without contacts"}
+        ${companies.length === 0 ? "no companies yet — add some to start building your pipeline" : "no matching companies"}
       </div>
     `
         : `
@@ -4841,7 +5013,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           <th class="co-th-resizable" style="width:${(state.coTableWidths || {}).company || 220}px;" data-col="company">company</th>
           <th class="co-th-resizable" style="width:${(state.coTableWidths || {}).contact || 200}px;" data-col="contact">contact</th>
           <th class="co-th-resizable" data-col="connections">connections</th>
-          <th style="width:80px;"></th>
+          <th style="width:120px;"></th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -4888,9 +5060,13 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         });
       }
 
-      function toggleCoFilter() {
-        coFilterNoContact = !coFilterNoContact;
+      function setCoFilter(val) {
+        coContactFilter = coContactFilter === val ? "" : val;
         renderCompanies();
+      }
+
+      function toggleCoFilter() {
+        setCoFilter("needs-intro");
       }
 
       function updateCompany(id, field, val) {
@@ -4907,6 +5083,189 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         state.companies = (state.companies || []).filter((c) => c.id !== id);
         saveState();
         renderCompanies();
+      }
+
+      // ── Archive company (not a fit) ────────────────────────
+      let archiveCoId = null;
+
+      function openArchiveCoModal(id) {
+        archiveCoId = id;
+        document.getElementById("archive-co-note").value = "";
+        document
+          .getElementById("archive-co-modal-overlay")
+          .classList.add("open");
+        setTimeout(
+          () => document.getElementById("archive-co-note").focus(),
+          50,
+        );
+      }
+
+      function closeArchiveCoModal() {
+        document
+          .getElementById("archive-co-modal-overlay")
+          .classList.remove("open");
+        archiveCoId = null;
+      }
+
+      function handleArchiveCoModalClick(e) {
+        if (e.target === document.getElementById("archive-co-modal-overlay"))
+          closeArchiveCoModal();
+      }
+
+      function confirmArchiveCompany() {
+        const co = (state.companies || []).find((c) => c.id === archiveCoId);
+        if (!co) return;
+        const note = document.getElementById("archive-co-note").value.trim();
+        const app = {
+          id: uid(),
+          status: "rejected",
+          role: "",
+          company: co.name,
+          salary: "",
+          bonus: "",
+          equity: "",
+          source: "",
+          link: "",
+          linkedinUrl: co.linkedinUrl || "",
+          careersUrl: co.careersUrl || "",
+          startDate: today(),
+          steps: [],
+          statusHistory: [{ from: null, to: "rejected", date: today() }],
+          notes: note
+            ? [
+                {
+                  id: uid(),
+                  text: note,
+                  indent: 0,
+                  date: today(),
+                  person: { name: "", linkedin: "" },
+                },
+              ]
+            : [],
+          jobDescription: "",
+          resources: "",
+        };
+        state.applications.push(app);
+        logEvent("app_added", {
+          appId: app.id,
+          company: app.company,
+          role: app.role,
+          status: "rejected",
+        });
+        if (note)
+          logEvent("note_added", {
+            appId: app.id,
+            company: app.company,
+            role: app.role,
+            text: note,
+          });
+        state.companies = (state.companies || []).filter(
+          (c) => c.id !== archiveCoId,
+        );
+        const strip = document.getElementById("archive-strip");
+        if (strip && window.spawnArchiveFire) {
+          const r = strip.getBoundingClientRect();
+          window.spawnArchiveFire(r.left + r.width / 2, r.top + r.height / 2);
+          strip.classList.add("burning");
+          setTimeout(() => strip.classList.remove("burning"), 900);
+        }
+        trackActivity();
+        saveState();
+        closeArchiveCoModal();
+        render();
+      }
+
+      // ── Move company to feeling things out ─────────────────
+      function moveCompanyToFeeling(id) {
+        const co = (state.companies || []).find((c) => c.id === id);
+        if (!co) return;
+        const app = {
+          id: uid(),
+          status: "feeling",
+          role: "",
+          company: co.name,
+          salary: "",
+          bonus: "",
+          equity: "",
+          source: "",
+          link: "",
+          linkedinUrl: co.linkedinUrl || "",
+          careersUrl: co.careersUrl || "",
+          startDate: today(),
+          steps: [],
+          statusHistory: [{ from: null, to: "feeling", date: today() }],
+          notes: [],
+          jobDescription: "",
+          resources: "",
+        };
+        state.applications.push(app);
+        state.companies = (state.companies || []).filter((c) => c.id !== co.id);
+        logEvent("app_added", {
+          appId: app.id,
+          company: app.company,
+          role: app.role,
+          status: "feeling",
+        });
+        trackActivity();
+        saveState();
+        render();
+        openPanel(app.id);
+      }
+
+      // ── Add company by contact ──────────────────────────────
+      function addCompanyByContact(contactName) {
+        const q = (contactName || "").trim();
+        if (!q) return;
+        const conns = getConnections();
+        if (!conns.length) {
+          showToast("no connections loaded — upload LinkedIn CSV first");
+          return;
+        }
+        const ql = q.toLowerCase();
+        const match = conns.find((c) => {
+          const full = `${c.firstName} ${c.lastName}`.toLowerCase();
+          return full === ql || full.startsWith(ql);
+        });
+        if (!match) {
+          showToast(`"${q}" not found in connections`);
+          return;
+        }
+        if (!match.company) {
+          showToast(
+            `${match.firstName} ${match.lastName} has no company in CSV`,
+          );
+          return;
+        }
+        const existing = (state.companies || []).find(
+          (c) => c.name.toLowerCase() === match.company.toLowerCase(),
+        );
+        if (existing) {
+          renderCompanies();
+          setTimeout(() => {
+            const row = document.querySelector(`[data-co-id="${existing.id}"]`);
+            if (row) {
+              row.scrollIntoView({ behavior: "smooth", block: "center" });
+              row.classList.add("highlight-pulse");
+              setTimeout(() => row.classList.remove("highlight-pulse"), 1600);
+            }
+          }, 50);
+          showToast(`${match.company} is already in your list`);
+          return;
+        }
+        if (!state.companies) state.companies = [];
+        state.companies.push({
+          id: uid(),
+          name: match.company,
+          linkedinUrl: "",
+          careersUrl: "",
+          contact: `${match.firstName} ${match.lastName}`,
+        });
+        trackActivity();
+        saveState();
+        renderCompanies();
+        showToast(
+          `added ${match.company} via ${match.firstName} ${match.lastName}`,
+        );
       }
 
       // ── Edit company modal ─────────────────────────────────
@@ -5100,7 +5459,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         document
           .getElementById("add-co-modal-overlay")
           .classList.remove("open");
-        ["ac-name", "ac-linkedin", "ac-contact"].forEach(
+        ["ac-name", "ac-linkedin", "ac-careers", "ac-contact"].forEach(
           (id) => (document.getElementById(id).value = ""),
         );
       }
@@ -5118,6 +5477,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           id: "co" + Math.random().toString(36).slice(2, 9),
           name,
           linkedinUrl: document.getElementById("ac-linkedin").value.trim(),
+          careersUrl: document.getElementById("ac-careers").value.trim(),
           contact: document.getElementById("ac-contact").value.trim(),
         });
         trackActivity();
