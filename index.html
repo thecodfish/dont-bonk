@@ -4297,7 +4297,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       function renderHeader() {
         const apps = state.applications;
         const total = apps.length + (state.companies || []).length;
-        const active = (state.companies || []).length;
+        const active = apps.filter((a) => a.status !== "rejected").length;
         const offers = apps.filter((a) => a.status === "offer").length;
 
         document.getElementById("header-stats").innerHTML = `
