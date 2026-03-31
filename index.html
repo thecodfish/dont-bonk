@@ -3305,6 +3305,23 @@
       <div style="display: flex; align-items: center; gap: 16px">
         <div class="header-stats" id="header-stats"></div>
         <button
+          id="backup-btn"
+          onclick="linkBackupFolder()"
+          style="
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 11px;
+            font-family: var(--mono);
+            color: var(--text3);
+            transition: color 0.15s;
+            padding: 0;
+          "
+          title="Set a backup folder for automatic daily backups"
+        >
+          ⬡ backup
+        </button>
+        <button
           id="file-link-btn"
           onclick="linkDataFile()"
           style="
@@ -3822,6 +3839,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
 
       // ── File System Access API (direct file read/write) ───
       let fileHandle = null;
+      let backupDirHandle = null;
       let loadedFromFile = false;
       let activeTab = "pipeline";
       let selectedQuestionId = null;
@@ -3924,14 +3942,19 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         }
         try {
           const r = await fetch(DATA_FILE + "?t=" + Date.now());
+          if (!r.ok) throw new Error("not found");
           state = await r.json();
         } catch (e) {
-          // fallback: use defaults
-          state = {
-            meta: { lastUpdated: today() },
-            columns: defaultCols(),
-            applications: [],
-          };
+          try {
+            const r = await fetch("data.default.json?t=" + Date.now());
+            state = await r.json();
+          } catch (e2) {
+            state = {
+              meta: { lastUpdated: today() },
+              columns: defaultCols(),
+              applications: [],
+            };
+          }
         }
       }
 
@@ -3948,13 +3971,75 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         ];
       }
 
-      // ── Save ──────────────────────────────────────────────
-      // NOTE: browsers can't write to local files directly.
-      // Saving is done via Cowork / Claude Code editing data.json.
-      // This app reads data.json on load. To persist in-app edits,
-      // we store changes in localStorage as a fallback overlay,
-      // and show a download button to sync back to data.json.
+      // ── Backup folder ─────────────────────────────────────
+      async function linkBackupFolder() {
+        if (!window.showDirectoryPicker) {
+          showToast("directory picker not supported");
+          return;
+        }
+        try {
+          backupDirHandle = await window.showDirectoryPicker({
+            mode: "readwrite",
+          });
+          await idbSet("backup-dir", backupDirHandle);
+          updateBackupStatus(true);
+          showToast("backup folder set — daily backups will save here");
+          await writeBackup();
+        } catch (e) {
+          if (e.name !== "AbortError") showToast("could not set backup folder");
+        }
+      }
 
+      async function getBackupDirPermission() {
+        if (!backupDirHandle) return false;
+        try {
+          const perm = await backupDirHandle.queryPermission({
+            mode: "readwrite",
+          });
+          if (perm === "granted") return true;
+          return (
+            (await backupDirHandle.requestPermission({ mode: "readwrite" })) ===
+            "granted"
+          );
+        } catch (e) {
+          return false;
+        }
+      }
+
+      async function writeBackup() {
+        if (!backupDirHandle || !(await getBackupDirPermission())) return;
+        try {
+          const filename = `data.backup.${today()}.json`;
+          const fh = await backupDirHandle.getFileHandle(filename, {
+            create: true,
+          });
+          const writable = await fh.createWritable();
+          await writable.write(JSON.stringify(state, null, 2));
+          await writable.close();
+          await idbSet("last-backup-date", today());
+        } catch (e) {}
+      }
+
+      async function maybeBackup() {
+        const lastBackup = await idbGet("last-backup-date");
+        if (lastBackup !== today()) await writeBackup();
+      }
+
+      function updateBackupStatus(linked) {
+        const btn = document.getElementById("backup-btn");
+        if (!btn) return;
+        if (linked) {
+          btn.textContent = "⬡ backup";
+          btn.style.color = "var(--green)";
+          btn.title = "Daily backups active — click to change folder";
+        } else {
+          btn.textContent = "⬡ backup";
+          btn.style.color = "var(--text3)";
+          btn.title = "Set a backup folder for automatic daily backups";
+        }
+      }
+
+      // ── Save ──────────────────────────────────────────────
       async function saveState() {
         state.meta.lastUpdated = today();
         if (fileHandle && (await getFilePermission())) {
@@ -3990,6 +4075,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       // On load: use file handle if available, else merge localStorage overlay
       async function init() {
         fileHandle = await idbGet("data-file");
+        backupDirHandle = await idbGet("backup-dir");
         await load();
         if (!loadedFromFile) {
           const saved = localStorage.getItem("job-search-data");
@@ -4033,6 +4119,8 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         initTodos();
         checkConnectionsStale();
         updateFileLinkStatus(loadedFromFile);
+        updateBackupStatus(!!backupDirHandle);
+        maybeBackup();
       }
 
       // ── Helpers ───────────────────────────────────────────
