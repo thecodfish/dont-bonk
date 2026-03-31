@@ -2098,6 +2098,58 @@
       }
 
       /* ── Todos ── */
+      .todo-edit-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text3);
+        font-size: 12px;
+        padding: 0 0 0 6px;
+        opacity: 0;
+        transition:
+          opacity 0.15s,
+          color 0.15s;
+        line-height: 1;
+        flex-shrink: 0;
+      }
+      .todo-item:hover .todo-edit-btn {
+        opacity: 1;
+      }
+      .todo-edit-btn:hover {
+        color: var(--accent);
+      }
+      .todo-edit-input {
+        background: none;
+        border: none;
+        border-bottom: 1px solid var(--accent);
+        color: var(--text);
+        font-size: 12px;
+        font-family: var(--mono);
+        padding: 0;
+        outline: none;
+        width: 100%;
+        min-width: 0;
+      }
+      .todo-undo-wrap .todo-item {
+        opacity: 0.5;
+        font-style: italic;
+      }
+      .todo-undo-btn {
+        background: none;
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        color: var(--accent);
+        font-size: 10px;
+        font-family: var(--mono);
+        padding: 2px 7px;
+        cursor: pointer;
+        margin-left: auto;
+        flex-shrink: 0;
+        transition: background 0.15s;
+      }
+      .todo-undo-btn:hover {
+        background: var(--accent-dim);
+      }
       .todos-head {
         display: flex;
         align-items: center;
@@ -6266,6 +6318,9 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       let todosHideDone = true;
       let lastAddedTodoId = null;
       let todosShowSettings = false;
+      let editingTodoId = null;
+      let undoTodoId = null;
+      let undoTimeout = null;
 
       function extractUrlFromText(raw) {
         const urlRe = /https?:\/\/[^\s]+/g;
@@ -6457,6 +6512,12 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         saveTodosData(data);
         if (markingDone) {
           trackActivity();
+          if (undoTimeout) clearTimeout(undoTimeout);
+          undoTodoId = id;
+          undoTimeout = setTimeout(() => {
+            undoTodoId = null;
+            renderTodos();
+          }, 4000);
           const el = document.querySelector(`.todo-item[data-todo-id="${id}"]`);
           if (el) {
             el.classList.add("completing");
@@ -6464,6 +6525,43 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             return;
           }
         }
+        renderTodos();
+      }
+
+      function undoTodoComplete(id) {
+        if (undoTimeout) {
+          clearTimeout(undoTimeout);
+          undoTimeout = null;
+        }
+        undoTodoId = null;
+        const data = getTodosData();
+        const item = data.items.find((i) => i.id === id);
+        if (!item) {
+          renderTodos();
+          return;
+        }
+        item.done = false;
+        saveTodosData(data);
+        renderTodos();
+      }
+
+      function saveTodoEdit(id, val) {
+        editingTodoId = null;
+        const trimmed = val.trim();
+        if (!trimmed) {
+          renderTodos();
+          return;
+        }
+        const data = getTodosData();
+        const item = data.items.find((i) => i.id === id);
+        if (!item) {
+          renderTodos();
+          return;
+        }
+        const { text, url } = extractUrlFromText(trimmed);
+        item.text = text || trimmed;
+        if (url && !item.url) item.url = url;
+        saveTodosData(data);
         renderTodos();
       }
 
@@ -6530,7 +6628,9 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
 
         // Combine regular todos (marked _type:'todo') with note-derived todos
         const visibleTodos = (
-          todosHideDone ? all.filter((i) => !i.done) : all
+          todosHideDone
+            ? all.filter((i) => !i.done || i.id === undoTodoId)
+            : all
         ).map((i) => ({ ...i, _type: "todo" }));
         const visibleNotes = todosHideDone
           ? noteTodos.filter((n) => !n.done)
@@ -6566,17 +6666,43 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           const coDisplayName = linkedCo
             ? linkedCo.name.replace(/"/g, "&quot;")
             : "";
+          const isUndo = undoTodoId === item.id && item.done;
+          if (isUndo) {
+            const safeText = item.text
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+            return `
+      <div class="todo-wrap todo-undo-wrap" data-todo-id="${item.id}">
+        <div class="todo-item done" data-todo-id="${item.id}" style="pointer-events:none;">
+          <div class="todo-check"><div class="todo-check-inner">✓</div></div>
+          <div class="todo-content"><span class="todo-text">${safeText}</span></div>
+          <button class="todo-undo-btn" style="pointer-events:auto;" onclick="undoTodoComplete('${item.id}')">undo</button>
+        </div>
+      </div>`;
+          }
+          const isEditing = editingTodoId === item.id;
+          const safeText = item.text
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+          const textHtml = isEditing
+            ? `<input class="todo-edit-input" value="${safeText}"
+                onclick="event.stopPropagation()"
+                onblur="saveTodoEdit('${item.id}',this.value)"
+                onkeydown="if(event.key==='Enter'){this.blur()}else if(event.key==='Escape'){editingTodoId=null;renderTodos()}" />`
+            : `<span class="todo-text">${item.text}</span>`;
           return `
       <div class="todo-wrap" data-todo-id="${item.id}">
-        <div class="todo-item${item.done ? " done" : ""}" data-todo-id="${item.id}" onclick="toggleTodo('${item.id}')">
+        <div class="todo-item${item.done ? " done" : ""}" data-todo-id="${item.id}" onclick="${isEditing ? "" : `toggleTodo('${item.id}')`}">
           <div class="todo-check"><div class="todo-check-inner">✓</div></div>
           <div class="todo-content">
-            <span class="todo-text">${item.text}</span>
-            ${item.url ? `<a class="todo-url" href="${item.url}" target="_blank" onclick="event.stopPropagation()">${urlDisplay(item.url)}</a>` : ""}
-            ${linkedCo ? `<span class="todo-company-badge">@ ${linkedCo.name}</span>` : ""}
+            ${textHtml}
+            ${!isEditing && item.url ? `<a class="todo-url" href="${item.url}" target="_blank" onclick="event.stopPropagation()">${urlDisplay(item.url)}</a>` : ""}
+            ${!isEditing && linkedCo ? `<span class="todo-company-badge">@ ${linkedCo.name}</span>` : ""}
           </div>
+          ${!item.done && !isEditing ? `<button class="todo-edit-btn" onclick="editingTodoId='${item.id}';renderTodos();event.stopPropagation()" title="edit">✎</button>` : ""}
           <button class="todo-del" onclick="deleteTodo('${item.id}',event)"
-            style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 0 0 8px;opacity:0;transition:opacity .15s;line-height:1;">×</button>
+            style="margin-left:${!item.done && !isEditing ? "4px" : "auto"};background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 0 0 4px;opacity:0;transition:opacity .15s;line-height:1;">×</button>
         </div>
         <div class="todo-person-row">
           <input class="todo-person-field todo-person-name" placeholder="name" value="${pName}" onclick="event.stopPropagation()" />
@@ -6700,6 +6826,13 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           );
           if (el) el.classList.add("appearing");
           lastAddedTodoId = null;
+        }
+        if (editingTodoId) {
+          const input = view.querySelector(".todo-edit-input");
+          if (input) {
+            input.focus();
+            input.select();
+          }
         }
         attachTodoPersonInputs();
         attachTodoAddPreview();
