@@ -901,6 +901,52 @@
       .outliner-line:hover .outliner-interview-btn {
         display: inline-flex;
       }
+      /* Action badge — appears on log notes that contain a watchword */
+      .note-action-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: 9px;
+        font-family: var(--mono);
+        color: var(--accent);
+        background: var(--accent-dim);
+        border: 1px solid rgba(124, 106, 247, 0.25);
+        border-radius: 3px;
+        padding: 1px 5px;
+        margin-left: 6px;
+        flex-shrink: 0;
+        line-height: 1.4;
+      }
+      .note-action-done-badge {
+        color: var(--text3);
+        background: none;
+        border-color: var(--border);
+        text-decoration: line-through;
+      }
+      .note-action-badge-dismiss {
+        display: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--text3);
+        font-size: 11px;
+        padding: 0;
+        margin-left: 1px;
+        line-height: 1;
+      }
+      .outliner-line:hover .note-action-badge-dismiss {
+        display: inline;
+      }
+      /* "log" source label on note-derived todos in the sidebar */
+      .todo-note-src {
+        font-size: 9px;
+        font-family: var(--mono);
+        color: var(--text3);
+        flex-shrink: 0;
+        margin-left: 4px;
+        opacity: 0.6;
+        white-space: nowrap;
+      }
 
       /* ── Interview Mode ── */
       .interview-overlay {
@@ -2060,6 +2106,24 @@
       }
       .todo-person-linkedin {
         flex: 1;
+      }
+      .todo-company-field {
+        color: var(--text2);
+        flex: 1;
+        min-width: 80px;
+      }
+      .todo-company-badge {
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--text3);
+        background: var(--surface3);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1px 5px;
+        margin-left: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        line-height: 1.4;
       }
       .todo-add-preview {
         display: flex;
@@ -4633,6 +4697,9 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           if (!app) return;
           app.notes = lines;
           saveState();
+          // Keep todo sidebar in sync as notes are typed
+          clearTimeout(window._noteTodoRenderTimer);
+          window._noteTodoRenderTimer = setTimeout(() => renderTodos(), 400);
         }
 
         function build(focusIdx, cursorAtEnd) {
@@ -4759,6 +4826,32 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
                 openInterviewMode(appId, line.id);
               });
               div.appendChild(iBtn);
+
+              // Action badge: if note text matches a watchword, surface as todo
+              const noteCat = categorizeTodo(line.text);
+              if (noteCat && !line.todoIgnore) {
+                const badge = document.createElement("span");
+                badge.className =
+                  "note-action-badge" +
+                  (line.todoDone ? " note-action-done-badge" : "");
+                const label = document.createElement("span");
+                label.textContent =
+                  (line.todoDone ? "✓ " : "") + noteCat.toLowerCase();
+                badge.appendChild(label);
+                const dismissBtn = document.createElement("button");
+                dismissBtn.className = "note-action-badge-dismiss";
+                dismissBtn.textContent = "×";
+                dismissBtn.title = "Remove from todos";
+                dismissBtn.addEventListener("click", (e) => {
+                  e.stopPropagation();
+                  lines[i].todoIgnore = true;
+                  saveLines();
+                  renderTodos();
+                  build(i, false);
+                });
+                badge.appendChild(dismissBtn);
+                div.appendChild(badge);
+              }
             }
 
             wrapper.appendChild(div);
@@ -6143,14 +6236,67 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         renderTodos();
       }
 
+      function toggleNoteTodo(appId, noteId) {
+        const app = findApp(appId);
+        if (!app) return;
+        const note = (app.notes || []).find((n) => n.id === noteId);
+        if (!note) return;
+        note.todoDone = !note.todoDone;
+        saveState();
+        renderTodos();
+        if (openId === appId) renderPanel(app);
+      }
+
+      function dismissNoteTodo(appId, noteId, e) {
+        if (e) e.stopPropagation();
+        const app = findApp(appId);
+        if (!app) return;
+        const note = (app.notes || []).find((n) => n.id === noteId);
+        if (!note) return;
+        note.todoIgnore = true;
+        saveState();
+        renderTodos();
+        if (openId === appId) renderPanel(app);
+      }
+
       function renderTodos() {
         const view = document.getElementById("todos-view");
         if (!view) return;
         const data = getTodosData();
         const all = data.items;
-        const total = all.length;
-        const doneCount = all.filter((i) => i.done).length;
-        const visible = todosHideDone ? all.filter((i) => !i.done) : all;
+
+        // Gather note-derived todos from application logs
+        const noteTodos = [];
+        (state.applications || []).forEach((app) => {
+          (app.notes || [])
+            .filter((n) => n.indent === 0 && n.text && !n.todoIgnore)
+            .forEach((note) => {
+              if (!categorizeTodo(note.text)) return;
+              noteTodos.push({
+                _type: "note",
+                id: "nt-" + note.id,
+                _appId: app.id,
+                _noteId: note.id,
+                _company: app.company,
+                text: note.text,
+                done: note.todoDone || false,
+              });
+            });
+        });
+
+        const total = all.length + noteTodos.length;
+        const doneCount =
+          all.filter((i) => i.done).length +
+          noteTodos.filter((n) => n.done).length;
+
+        // Combine regular todos (marked _type:'todo') with note-derived todos
+        const visibleTodos = (
+          todosHideDone ? all.filter((i) => !i.done) : all
+        ).map((i) => ({ ...i, _type: "todo" }));
+        const visibleNotes = todosHideDone
+          ? noteTodos.filter((n) => !n.done)
+          : noteTodos;
+        const visible = [...visibleTodos, ...visibleNotes];
 
         // Group by watchword-derived category
         const groups = {};
@@ -6175,6 +6321,12 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         function itemHtml(item) {
           const pName = (item.person?.name || "").replace(/"/g, "&quot;");
           const pLi = (item.person?.linkedin || "").replace(/"/g, "&quot;");
+          const linkedCo = (state.companies || []).find(
+            (c) => c.id === item.companyId,
+          );
+          const coDisplayName = linkedCo
+            ? linkedCo.name.replace(/"/g, "&quot;")
+            : "";
           return `
       <div class="todo-wrap" data-todo-id="${item.id}">
         <div class="todo-item${item.done ? " done" : ""}" data-todo-id="${item.id}" onclick="toggleTodo('${item.id}')">
@@ -6182,6 +6334,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           <div class="todo-content">
             <span class="todo-text">${item.text}</span>
             ${item.url ? `<a class="todo-url" href="${item.url}" target="_blank" onclick="event.stopPropagation()">${urlDisplay(item.url)}</a>` : ""}
+            ${linkedCo ? `<span class="todo-company-badge">@ ${linkedCo.name}</span>` : ""}
           </div>
           <button class="todo-del" onclick="deleteTodo('${item.id}',event)"
             style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0 0 0 8px;opacity:0;transition:opacity .15s;line-height:1;">×</button>
@@ -6189,6 +6342,28 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         <div class="todo-person-row">
           <input class="todo-person-field todo-person-name" placeholder="name" value="${pName}" onclick="event.stopPropagation()" />
           <input class="todo-person-field todo-person-linkedin" placeholder="linkedin.com/in/…" value="${pLi}" onclick="event.stopPropagation()" />
+          <input class="todo-person-field todo-company-field" list="todo-company-list" placeholder="@ company" value="${coDisplayName}" onclick="event.stopPropagation()" />
+        </div>
+      </div>`;
+        }
+
+        function noteItemHtml(nt) {
+          const safeText = nt.text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+          const safeCompany = (nt._company || "").replace(/"/g, "&quot;");
+          return `
+      <div class="todo-wrap" data-todo-id="${nt.id}">
+        <div class="todo-item${nt.done ? " done" : ""}" onclick="toggleNoteTodo('${nt._appId}','${nt._noteId}')">
+          <div class="todo-check"><div class="todo-check-inner">✓</div></div>
+          <div class="todo-content">
+            <span class="todo-text">${safeText}</span>
+            ${nt._company ? `<span class="todo-company-badge">@ ${safeCompany}</span>` : ""}
+          </div>
+          <span class="todo-note-src">log</span>
+          <button class="todo-del" onclick="dismissNoteTodo('${nt._appId}','${nt._noteId}',event)"
+            style="margin-left:4px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:0;opacity:0;transition:opacity .15s;line-height:1;">×</button>
         </div>
       </div>`;
         }
@@ -6240,23 +6415,34 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         const catOrder = (state.todoCategories || [])
           .map((c) => c.name)
           .filter((n) => groups[n]);
+        const renderItem = (item) =>
+          item._type === "note" ? noteItemHtml(item) : itemHtml(item);
+
         if (!visible.length) {
           html += `<div class="empty" style="padding:20px 0;">${todosHideDone ? "all done ✓" : "no todos yet"}</div>`;
         } else {
           catOrder.forEach((cat) => {
             html += `<div class="todos-section-label">${cat}</div>`;
             groups[cat].forEach((item) => {
-              html += itemHtml(item);
+              html += renderItem(item);
             });
           });
           if (uncategorized.length) {
             if (catOrder.length)
               html += `<div class="todos-section-label">general</div>`;
             uncategorized.forEach((item) => {
-              html += itemHtml(item);
+              html += renderItem(item);
             });
           }
         }
+
+        const coOptions = (state.companies || [])
+          .map(
+            (c) =>
+              `<option value="${c.name.replace(/"/g, "&quot;")}"></option>`,
+          )
+          .join("");
+        html += `<datalist id="todo-company-list">${coOptions}</datalist>`;
 
         html += `
     <div class="todos-add-row">
@@ -6303,6 +6489,27 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             item.person.linkedin = liInput.value;
             saveTodosData(data);
           });
+          const coInput = wrap.querySelector(".todo-company-field");
+          if (coInput) {
+            coInput.addEventListener("change", () => {
+              const typed = coInput.value.trim();
+              const data = getTodosData();
+              const item = data.items.find((i) => i.id === id);
+              if (!item) return;
+              if (!typed) {
+                item.companyId = null;
+              } else {
+                const match = (state.companies || []).find(
+                  (c) => c.name.toLowerCase() === typed.toLowerCase(),
+                );
+                item.companyId = match ? match.id : null;
+                // Reset display to matched name or clear if no match
+                coInput.value = match ? match.name : "";
+              }
+              saveTodosData(data);
+              renderTodos();
+            });
+          }
           attachNameAutocomplete(null, nameInput, liInput);
         });
       }
