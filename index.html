@@ -1873,6 +1873,58 @@
         color: var(--green);
         border-color: rgba(74, 222, 128, 0.3);
       }
+      .ac-contact-wrap {
+        position: relative;
+      }
+      .ac-contact-suggestions {
+        display: none;
+        position: absolute;
+        top: calc(100% + 2px);
+        left: 0;
+        right: 0;
+        background: var(--surface2);
+        border: 1px solid var(--border2);
+        border-radius: var(--radius);
+        z-index: 200;
+        max-height: 160px;
+        overflow-y: auto;
+      }
+      .ac-contact-suggestion {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .ac-contact-suggestion:hover {
+        background: var(--surface3);
+      }
+      .ac-cs-name {
+        font-family: var(--mono);
+        color: var(--text);
+        flex-shrink: 0;
+      }
+      .ac-cs-company {
+        font-family: var(--mono);
+        color: var(--text2);
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .todo-li-arrow {
+        font-size: 11px;
+        color: var(--accent);
+        text-decoration: none;
+        opacity: 0.6;
+        flex-shrink: 0;
+        line-height: 1;
+        transition: opacity 0.1s;
+      }
+      .todo-li-arrow:hover {
+        opacity: 1;
+      }
       .co-add-contact-wrap {
         display: flex;
         align-items: center;
@@ -2084,7 +2136,7 @@
         gap: 8px;
         margin-left: 22px;
         margin-top: 1px;
-        margin-bottom: 3px;
+        margin-bottom: 10px;
       }
       .todo-person-field {
         background: none;
@@ -3468,11 +3520,17 @@
         <label>Careers page (optional)</label>
         <input id="ac-careers" type="text" placeholder="https://..." />
         <label>Contact (optional)</label>
-        <input
-          id="ac-contact"
-          type="text"
-          placeholder="Person who can make an intro"
-        />
+        <div class="ac-contact-wrap">
+          <input
+            id="ac-contact"
+            type="text"
+            placeholder="Person who can make an intro"
+            autocomplete="off"
+            oninput="onAcContactInput()"
+            onblur="onAcContactBlur()"
+          />
+          <div class="ac-contact-suggestions" id="ac-contact-suggestions"></div>
+        </div>
         <div class="modal-actions">
           <button class="btn" onclick="closeAddCoModal()">cancel</button>
           <button class="btn btn-primary" onclick="saveNewCompany()">
@@ -4624,7 +4682,6 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       <div class="panel-header-top" style="margin-top:${app.image ? "12px" : "0"}">
         <div style="flex:1;">
           <div class="panel-co" id="panel-co">${app.company}</div>
-          <textarea class="panel-title" rows="1" id="panel-title" onchange="updateField('${app.id}','role',this.value)" oninput="autoResize(this)">${app.role}</textarea>
         </div>
         <button class="close-btn" onclick="closePanel()">×</button>
       </div>
@@ -4636,6 +4693,8 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       <div>
         <div class="section-label">Details</div>
         <div class="field-grid">
+          <span class="field-key">role</span>
+          <input class="field-input" value="${(app.role || "").replace(/"/g, "&quot;")}" placeholder="e.g. Senior PM" onchange="updateField('${app.id}','role',this.value)" />
           <span class="field-key">company</span>
           <input class="field-input" value="${app.company}" onchange="updateField('${app.id}','company',this.value);document.getElementById('panel-co').textContent=this.value;" />
           <span class="field-key">start date</span>
@@ -4697,8 +4756,6 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
   `;
 
         setTimeout(() => {
-          const ta = document.getElementById("panel-title");
-          if (ta) autoResize(ta);
           if (!app.notes || app.notes.length === 0)
             app.notes = [{ id: uid(), text: "", indent: 0, date: today() }];
           makeOutliner("outliner-notes", app.notes, app.id);
@@ -5643,6 +5700,60 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         ["ac-name", "ac-linkedin", "ac-careers", "ac-contact"].forEach(
           (id) => (document.getElementById(id).value = ""),
         );
+        const sug = document.getElementById("ac-contact-suggestions");
+        if (sug) {
+          sug.innerHTML = "";
+          sug.style.display = "none";
+        }
+      }
+
+      function onAcContactInput() {
+        const input = document.getElementById("ac-contact");
+        const list = document.getElementById("ac-contact-suggestions");
+        if (!list) return;
+        const q = input.value.trim();
+        if (!q) {
+          list.innerHTML = "";
+          list.style.display = "none";
+          return;
+        }
+        const matches = lookupConnections(q);
+        if (!matches.length) {
+          list.innerHTML = "";
+          list.style.display = "none";
+          return;
+        }
+        list.innerHTML = matches
+          .map((m) => {
+            const name = `${m.firstName} ${m.lastName}`.trim();
+            const co = m.company || "";
+            const safeName = name.replace(/'/g, "\\'");
+            return `<div class="ac-contact-suggestion" onmousedown="selectAcContactSuggestion('${safeName}')">
+            <span class="ac-cs-name">${name}</span>${co ? `<span class="ac-cs-company">${co}</span>` : ""}
+          </div>`;
+          })
+          .join("");
+        list.style.display = "block";
+      }
+
+      function onAcContactBlur() {
+        setTimeout(() => {
+          const list = document.getElementById("ac-contact-suggestions");
+          if (list) {
+            list.innerHTML = "";
+            list.style.display = "none";
+          }
+        }, 150);
+      }
+
+      function selectAcContactSuggestion(name) {
+        const input = document.getElementById("ac-contact");
+        if (input) input.value = name;
+        const list = document.getElementById("ac-contact-suggestions");
+        if (list) {
+          list.innerHTML = "";
+          list.style.display = "none";
+        }
       }
 
       function handleAddCoModalClick(e) {
@@ -5654,6 +5765,25 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         const name = document.getElementById("ac-name").value.trim();
         if (!name) return;
         if (!state.companies) state.companies = [];
+        const duplicate = state.companies.find(
+          (c) => c.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (duplicate) {
+          closeAddCoModal();
+          renderCompanies();
+          setTimeout(() => {
+            const row = document.querySelector(
+              `[data-co-id="${duplicate.id}"]`,
+            );
+            if (row) {
+              row.scrollIntoView({ behavior: "smooth", block: "center" });
+              row.classList.add("highlight-pulse");
+              setTimeout(() => row.classList.remove("highlight-pulse"), 1600);
+            }
+          }, 50);
+          showToast(`${name} is already in your pipeline`);
+          return;
+        }
         state.companies.push({
           id: "co" + Math.random().toString(36).slice(2, 9),
           name,
@@ -6429,6 +6559,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         </div>
         <div class="todo-person-row">
           <input class="todo-person-field todo-person-name" placeholder="name" value="${pName}" onclick="event.stopPropagation()" />
+          ${pLi ? `<a class="todo-li-arrow" href="${pLi}" target="_blank" onclick="event.stopPropagation()" title="LinkedIn profile">↗</a>` : ""}
           <input class="todo-person-field todo-person-linkedin" placeholder="linkedin.com/in/…" value="${pLi}" onclick="event.stopPropagation()" />
           <input class="todo-person-field todo-company-field" list="todo-company-list" placeholder="@ company" value="${coDisplayName}" onclick="event.stopPropagation()" />
         </div>
