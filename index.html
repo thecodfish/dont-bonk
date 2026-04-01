@@ -4422,6 +4422,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       let backupDirHandle = null;
       let loadedFromFile = false;
       let activeTab = "pipeline";
+      const syncChannel = new BroadcastChannel("job-search-sync");
       let selectedQuestionId = null;
       let editingStoryId = null;
       let tempStoryQuestions = [];
@@ -4596,13 +4597,15 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           const writable = await fh.createWritable();
           await writable.write(JSON.stringify(state, null, 2));
           await writable.close();
-          await idbSet("last-backup-date", today());
+          await idbSet("last-backup-date", Date.now());
         } catch (e) {}
       }
 
       async function maybeBackup() {
         const lastBackup = await idbGet("last-backup-date");
-        if (lastBackup !== today()) await writeBackup();
+        const sixHours = 6 * 60 * 60 * 1000;
+        if (!lastBackup || Date.now() - lastBackup > sixHours)
+          await writeBackup();
       }
 
       function updateBackupStatus(linked) {
@@ -4611,7 +4614,7 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         if (linked) {
           btn.textContent = "⬡ backup";
           btn.style.color = "var(--green)";
-          btn.title = "Daily backups active — click to change folder";
+          btn.title = "Backups active (every 6h) — click to change folder";
         } else {
           btn.textContent = "⬡ backup";
           btn.style.color = "var(--text3)";
@@ -4629,11 +4632,14 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
             await writable.close();
             updateFileLinkStatus(true);
             renderHeader();
+            maybeBackup();
+            syncChannel.postMessage({ type: "state-update", state });
             return;
           } catch (e) {}
         }
         localStorage.setItem("job-search-data", JSON.stringify(state));
         renderHeader();
+        syncChannel.postMessage({ type: "state-update", state });
       }
 
       function logEvent(type, data) {
@@ -4701,6 +4707,15 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         updateFileLinkStatus(loadedFromFile);
         updateBackupStatus(!!backupDirHandle);
         maybeBackup();
+        syncChannel.onmessage = (event) => {
+          if (event.data?.type !== "state-update") return;
+          const incoming = event.data.state;
+          if (!incoming?.meta) return;
+          state = incoming;
+          render();
+          if (activeTab === "stories") renderStories();
+          showToast("synced from another tab");
+        };
       }
 
       // ── Helpers ───────────────────────────────────────────
