@@ -2449,6 +2449,152 @@
       .todo-item.done .todo-url {
         color: var(--text3);
       }
+      /* ── Job Discovery ── */
+      .co-jobs-badge {
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--green);
+        background: var(--green-dim);
+        border: 1px solid rgba(74, 222, 128, 0.2);
+        border-radius: 10px;
+        padding: 1px 7px;
+        white-space: nowrap;
+      }
+      .co-jobs-loading {
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--text3);
+        animation: pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      #edit-co-modal-overlay .modal {
+        width: 500px;
+      }
+      .ec-jobs-section {
+        margin-top: 14px;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+      }
+      .ec-jobs-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+      }
+      .ec-jobs-label {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .ec-jobs-refresh-btn {
+        font-size: 11px;
+        padding: 3px 10px;
+      }
+      .ec-jobs-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .ec-jobs-content::-webkit-scrollbar {
+        width: 4px;
+      }
+      .ec-jobs-content::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .ec-jobs-content::-webkit-scrollbar-thumb {
+        background: var(--border2);
+        border-radius: 2px;
+      }
+      .job-item {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 5px 8px;
+        background: var(--surface2);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+      }
+      .job-item:hover {
+        border-color: var(--border2);
+        background: var(--surface3);
+      }
+      .job-title {
+        font-size: 12px;
+        font-family: var(--mono);
+        color: var(--accent);
+        text-decoration: none;
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .job-title:hover {
+        text-decoration: underline;
+      }
+      .job-meta {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--text3);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .job-copy-btn {
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--text3);
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0 2px;
+        flex-shrink: 0;
+        opacity: 0;
+        transition:
+          opacity 0.1s,
+          color 0.1s;
+      }
+      .job-item:hover .job-copy-btn {
+        opacity: 1;
+      }
+      .job-copy-btn:hover {
+        color: var(--accent);
+      }
+      .job-copy-btn.copied {
+        color: var(--green);
+        opacity: 1;
+      }
+      .ec-jobs-status {
+        font-size: 11px;
+        font-family: var(--mono);
+        color: var(--text3);
+        padding: 6px 0;
+      }
+      .ec-jobs-url {
+        font-size: 10px;
+        font-family: var(--mono);
+        color: var(--text3);
+        margin-top: 6px;
+      }
+      .ec-jobs-url a {
+        color: var(--text3);
+        text-decoration: none;
+      }
+      .ec-jobs-url a:hover {
+        color: var(--accent);
+      }
+
       /* ── Todos Settings ── */
       .todos-settings {
         background: var(--surface2);
@@ -3378,6 +3524,30 @@
         <button class="apikey-save" onclick="saveGithubToken()">save →</button>
       </div>
       <div class="settings-row">
+        <span class="apikey-label">Firecrawl API key (for job discovery):</span>
+        <input
+          type="password"
+          id="firecrawl-key-input"
+          placeholder="fc-..."
+          autocomplete="off"
+          onkeydown="if (event.key === 'Enter') saveFirecrawlKey();"
+        />
+        <button class="apikey-save" onclick="saveFirecrawlKey()">save →</button>
+      </div>
+      <div class="settings-row">
+        <span class="apikey-label">Job role filter:</span>
+        <input
+          type="text"
+          id="job-role-filter-input"
+          placeholder="e.g. product manager"
+          autocomplete="off"
+          onkeydown="if (event.key === 'Enter') saveJobRoleFilter();"
+        />
+        <button class="apikey-save" onclick="saveJobRoleFilter()">
+          save →
+        </button>
+      </div>
+      <div class="settings-row">
         <span class="apikey-label">LinkedIn connections (CSV):</span>
         <button
           class="apikey-save"
@@ -3561,12 +3731,7 @@
       <div class="modal">
         <h3>// add company</h3>
         <label>Company name</label>
-        <input
-          id="ac-name"
-          type="text"
-          placeholder="e.g. Anthropic"
-          onblur="onCompanyNameBlur()"
-        />
+        <input id="ac-name" type="text" placeholder="e.g. Anthropic" />
         <label>LinkedIn URL</label>
         <input
           id="ac-linkedin"
@@ -3652,6 +3817,19 @@
           type="text"
           placeholder="Person who can make an intro"
         />
+        <div class="ec-jobs-section" id="ec-jobs-section">
+          <div class="ec-jobs-header">
+            <span class="ec-jobs-label">open roles</span>
+            <button
+              class="btn ec-jobs-refresh-btn"
+              id="ec-jobs-refresh-btn"
+              onclick="refreshJobsFromModal()"
+            >
+              find jobs →
+            </button>
+          </div>
+          <div id="ec-jobs-content" class="ec-jobs-content"></div>
+        </div>
         <div class="modal-actions">
           <button class="btn" onclick="closeEditCoModal()">cancel</button>
           <button class="btn btn-primary" onclick="saveEditCompany()">
@@ -3825,7 +4003,38 @@
         localStorage.setItem("gist-id", id);
       }
 
-      function toggleApiKeyBanner() {
+      // ── Firecrawl key (IndexedDB — persists across Dia restarts) ──
+      let _firecrawlKey = null;
+      async function getFirecrawlKey() {
+        if (_firecrawlKey !== null) return _firecrawlKey;
+        _firecrawlKey = (await idbGet("firecrawl-key")) || "";
+        return _firecrawlKey;
+      }
+      async function saveFirecrawlKey() {
+        const val = document.getElementById("firecrawl-key-input").value.trim();
+        _firecrawlKey = val;
+        await idbSet("firecrawl-key", val);
+        document.getElementById("apikey-banner").style.display = "none";
+        showToast("Firecrawl key saved");
+      }
+
+      let _jobRoleFilter = null;
+      async function getJobRoleFilter() {
+        if (_jobRoleFilter !== null) return _jobRoleFilter;
+        _jobRoleFilter = (await idbGet("job-role-filter")) || "";
+        return _jobRoleFilter;
+      }
+      async function saveJobRoleFilter() {
+        const val = document
+          .getElementById("job-role-filter-input")
+          .value.trim();
+        _jobRoleFilter = val;
+        await idbSet("job-role-filter", val);
+        document.getElementById("apikey-banner").style.display = "none";
+        showToast(val ? `Job filter set: "${val}"` : "Job filter cleared");
+      }
+
+      async function toggleApiKeyBanner() {
         const banner = document.getElementById("apikey-banner");
         const isHidden = banner.style.display === "none";
         banner.style.display = isHidden ? "flex" : "none";
@@ -3834,8 +4043,265 @@
           inp.value = getApiKey();
           document.getElementById("github-token-input").value =
             getGithubToken();
+          document.getElementById("firecrawl-key-input").value =
+            await getFirecrawlKey();
+          document.getElementById("job-role-filter-input").value =
+            await getJobRoleFilter();
           setTimeout(() => inp.focus(), 50);
         }
+      }
+
+      // ── Job discovery via Firecrawl ────────────────────────
+      function findJobBoardUrl(results) {
+        const atsDomains = [
+          "ashbyhq.com",
+          "boards.greenhouse.io",
+          "jobs.lever.co",
+          "greenhouse.io",
+          "lever.co",
+          "workday.com",
+          "myworkdayjobs.com",
+          "jobs.ashbyhq.com",
+          "smartrecruiters.com",
+          "careers.icims.com",
+          "jobs.jobvite.com",
+          "apply.workable.com",
+        ];
+        for (const r of results) {
+          if (!r.url) continue;
+          for (const domain of atsDomains) {
+            if (r.url.includes(domain)) return r.url;
+          }
+        }
+        for (const r of results) {
+          if (
+            r.url &&
+            /\/(jobs|careers|openings|positions|opportunities)\b/i.test(r.url)
+          ) {
+            return r.url;
+          }
+        }
+        return results[0]?.url || null;
+      }
+
+      // ── ATS-specific job fetchers ──────────────────────────
+      function detectATS(url) {
+        if (!url) return "unknown";
+        if (/myworkdayjobs\.com/i.test(url)) return "workday";
+        if (/greenhouse\.io/i.test(url)) return "greenhouse";
+        if (/lever\.co/i.test(url)) return "lever";
+        if (/ashbyhq\.com/i.test(url)) return "ashby";
+        return "unknown";
+      }
+
+      async function fetchWorkdayJobs(url, roleFilter) {
+        const m = url.match(
+          /https?:\/\/([^.]+)\.(wd\d+)\.myworkdayjobs\.com\/([^/?#]+)/i,
+        );
+        if (!m) throw new Error("Could not parse Workday URL");
+        const [, company, instance, board] = m;
+        const apiUrl = `https://${company}.${instance}.myworkdayjobs.com/wday/cxs/${company}/${board}/jobs`;
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            appliedFacets: {},
+            limit: 20,
+            offset: 0,
+            searchText: roleFilter || "",
+          }),
+        });
+        if (!res.ok) throw new Error(`Workday API ${res.status}`);
+        const data = await res.json();
+        const base = `https://${company}.${instance}.myworkdayjobs.com`;
+        return (data.jobPostings || []).map((j) => ({
+          title: j.title,
+          department: "",
+          location: j.locationsText || "",
+          url: j.externalPath ? base + j.externalPath : "",
+        }));
+      }
+
+      async function fetchGreenhouseJobs(url, roleFilter) {
+        const m = url.match(/greenhouse\.io\/([^/?#]+)/i);
+        if (!m) throw new Error("Could not parse Greenhouse URL");
+        const company = m[1].split("/")[0];
+        const res = await fetch(
+          `https://boards-api.greenhouse.io/v1/boards/${company}/jobs?content=true`,
+        );
+        if (!res.ok) throw new Error(`Greenhouse API ${res.status}`);
+        const data = await res.json();
+        let jobs = (data.jobs || []).map((j) => ({
+          title: j.title,
+          department: j.departments?.[0]?.name || "",
+          location: j.location?.name || "",
+          url: j.absolute_url || "",
+        }));
+        if (roleFilter) {
+          const f = roleFilter.toLowerCase();
+          jobs = jobs.filter(
+            (j) =>
+              j.title.toLowerCase().includes(f) ||
+              j.department.toLowerCase().includes(f),
+          );
+        }
+        return jobs;
+      }
+
+      async function fetchLeverJobs(url, roleFilter) {
+        const m = url.match(/lever\.co\/([^/?#]+)/i);
+        if (!m) throw new Error("Could not parse Lever URL");
+        const company = m[1];
+        const res = await fetch(
+          `https://api.lever.co/v0/postings/${company}?mode=json&limit=250`,
+        );
+        if (!res.ok) throw new Error(`Lever API ${res.status}`);
+        const data = await res.json();
+        let jobs = (Array.isArray(data) ? data : []).map((j) => ({
+          title: j.text,
+          department: j.categories?.team || j.categories?.department || "",
+          location:
+            j.categories?.location || j.categories?.allLocations?.[0] || "",
+          url: j.hostedUrl || "",
+        }));
+        if (roleFilter) {
+          const f = roleFilter.toLowerCase();
+          jobs = jobs.filter(
+            (j) =>
+              j.title.toLowerCase().includes(f) ||
+              j.department.toLowerCase().includes(f),
+          );
+        }
+        return jobs;
+      }
+
+      async function fetchJobsViaFirecrawl(key, careersUrl, roleFilter) {
+        const extractPrompt = roleFilter
+          ? `Extract only job positions relevant to "${roleFilter}" from this page (include variations, seniority levels, and closely related roles). Return a JSON object with a 'jobs' array. Each job: title (string), department (string, may be empty), location (string, may be empty), url (string — full URL to the job posting page if available).`
+          : "Extract all open job positions from this page. Return a JSON object with a 'jobs' array. Each job: title (string), department (string, may be empty), location (string, may be empty), url (string — full URL to the job posting page if available).";
+        const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({
+            url: careersUrl,
+            formats: ["extract"],
+            actions: [{ type: "wait", milliseconds: 2000 }],
+            extract: { prompt: extractPrompt },
+          }),
+        });
+        if (!res.ok) throw new Error(`Firecrawl scrape ${res.status}`);
+        const data = await res.json();
+        const extracted = data.data?.extract || data.extract || {};
+        return Array.isArray(extracted.jobs) ? extracted.jobs : [];
+      }
+
+      async function firecrawlSearch(key, query, limit = 5) {
+        const res = await fetch("https://api.firecrawl.dev/v1/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${key}`,
+          },
+          body: JSON.stringify({ query, limit }),
+        });
+        if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+        const data = await res.json();
+        return data.data || data.results || [];
+      }
+
+      async function discoverJobs(coId) {
+        const co = (state.companies || []).find((c) => c.id === coId);
+        if (!co) return;
+        const key = await getFirecrawlKey();
+        if (!key) {
+          showToast("Add a Firecrawl API key in ✦ settings to find jobs");
+          return;
+        }
+        co.jobsStatus = "loading";
+        await saveState();
+        renderCompanies();
+        if (editCoId === coId) renderJobsInModal(co);
+
+        try {
+          // Run URL discovery searches in parallel (only if careersUrl not already known)
+          if (!co.careersUrl || !co.linkedinUrl) {
+            const searches = [
+              firecrawlSearch(
+                key,
+                `${co.name} jobs site:ashbyhq.com OR site:greenhouse.io OR site:lever.co OR site:workday.com OR site:myworkdayjobs.com`,
+                5,
+              ),
+              firecrawlSearch(key, `${co.name} open positions jobs`, 5),
+            ];
+            const liIdx = !co.linkedinUrl
+              ? searches.push(
+                  firecrawlSearch(
+                    key,
+                    `${co.name} site:linkedin.com/company`,
+                    3,
+                  ),
+                ) - 1
+              : -1;
+            const careersIdx = !co.careersUrl
+              ? searches.push(
+                  firecrawlSearch(key, `${co.name} careers jobs`, 3),
+                ) - 1
+              : -1;
+            const allResults = await Promise.all(searches);
+
+            if (liIdx >= 0) {
+              const liUrl = allResults[liIdx].find((r) =>
+                r.url?.includes("linkedin.com/company"),
+              )?.url;
+              if (liUrl)
+                co.linkedinUrl = liUrl.split("?")[0].replace(/\/$/, "") + "/";
+            }
+            if (careersIdx >= 0 && !co.careersUrl) {
+              const careersUrl = allResults[careersIdx].find(
+                (r) =>
+                  r.url &&
+                  /\/(careers|jobs)\b/i.test(r.url) &&
+                  !r.url.includes("linkedin.com"),
+              )?.url;
+              if (careersUrl) co.careersUrl = careersUrl;
+            }
+            if (!co.careersUrl) {
+              const discovered =
+                findJobBoardUrl(allResults[0]) ||
+                findJobBoardUrl(allResults[1]);
+              if (!discovered) throw new Error("No job board URL found");
+              co.careersUrl = discovered;
+            }
+          }
+
+          // Fetch jobs via ATS API or Firecrawl fallback
+          const roleFilter = await getJobRoleFilter();
+          const ats = detectATS(co.careersUrl);
+          let jobs;
+          if (ats === "workday") {
+            jobs = await fetchWorkdayJobs(co.careersUrl, roleFilter);
+          } else if (ats === "greenhouse") {
+            jobs = await fetchGreenhouseJobs(co.careersUrl, roleFilter);
+          } else if (ats === "lever") {
+            jobs = await fetchLeverJobs(co.careersUrl, roleFilter);
+          } else {
+            jobs = await fetchJobsViaFirecrawl(key, co.careersUrl, roleFilter);
+          }
+          co.jobs = jobs;
+          co.jobsStatus = jobs.length > 0 ? "done" : "empty";
+          co.jobsLastFetched = today();
+        } catch (err) {
+          console.error("Job discovery error:", err);
+          co.jobsStatus = "error";
+          co.jobsError = err.message;
+        }
+
+        await saveState();
+        renderCompanies();
+        if (editCoId === coId) renderJobsInModal(co);
       }
 
       // ── GitHub Gist sync ───────────────────────────────────
@@ -5231,7 +5697,11 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       <td class="co-drag-handle" title="Drag onto the board to start tracking">⠿</td>
       <td>
         <div class="co-name-cell">
-          <span class="co-name">${c.name}</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="co-name">${c.name}</span>
+            ${c.jobsStatus === "loading" ? `<span class="co-jobs-loading">finding jobs…</span>` : ""}
+            ${c.jobsStatus === "done" && c.jobs?.length ? `<span class="co-jobs-badge">${c.jobs.length} open</span>` : ""}
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             ${
               c.linkedinUrl
@@ -5590,8 +6060,83 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
         document.getElementById("ec-linkedin").value = co.linkedinUrl || "";
         document.getElementById("ec-careers").value = co.careersUrl || "";
         document.getElementById("ec-contact").value = co.contact || "";
+        renderJobsInModal(co);
         document.getElementById("edit-co-modal-overlay").classList.add("open");
         setTimeout(() => document.getElementById("ec-name").focus(), 50);
+      }
+
+      function renderJobsInModal(co) {
+        const content = document.getElementById("ec-jobs-content");
+        const btn = document.getElementById("ec-jobs-refresh-btn");
+        if (!content) return;
+        if (btn)
+          btn.textContent =
+            co.jobsStatus === "loading" ? "searching…" : "find jobs →";
+        if (btn) btn.disabled = co.jobsStatus === "loading";
+
+        if (co.jobsStatus === "loading") {
+          content.innerHTML = `<span class="ec-jobs-status">searching for open roles…</span>`;
+        } else if (co.jobs && co.jobs.length > 0) {
+          const jobRows = co.jobs
+            .map((j) => {
+              const meta = [j.department, j.location]
+                .filter(Boolean)
+                .join(" · ");
+              const titleEl = j.url
+                ? `<a class="job-title" href="${j.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${j.title || "Untitled"}</a>`
+                : `<span class="job-title" style="color:var(--text)">${j.title || "Untitled"}</span>`;
+              const copyBtn = j.url
+                ? `<button class="job-copy-btn" data-url="${j.url.replace(/"/g, "&quot;")}" onclick="event.stopPropagation();copyJobUrl(this)" title="Copy link">copy</button>`
+                : "";
+              return `<div class="job-item">${titleEl}${meta ? `<span class="job-meta">${meta}</span>` : ""}${copyBtn}</div>`;
+            })
+            .join("");
+          const urlNote = co.careersUrl
+            ? `<div class="ec-jobs-url">source: <a href="${co.careersUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${co.careersUrl}</a></div>`
+            : "";
+          content.innerHTML = jobRows + urlNote;
+        } else if (co.jobsStatus === "error") {
+          content.innerHTML = `<span class="ec-jobs-status" style="color:var(--red)">couldn't find jobs — ${co.jobsError || "unknown error"}</span>`;
+        } else if (co.jobsStatus === "empty") {
+          content.innerHTML = `<span class="ec-jobs-status">no open roles found</span>`;
+        } else {
+          content.innerHTML = `<span class="ec-jobs-status">click "find jobs →" to search</span>`;
+        }
+      }
+
+      function refreshJobsFromModal() {
+        if (editCoId) discoverJobs(editCoId);
+      }
+
+      function copyJobUrl(btn) {
+        const url = btn.dataset.url;
+        if (!url) return;
+        const done = () => {
+          btn.textContent = "✓";
+          btn.classList.add("copied");
+          setTimeout(() => {
+            btn.textContent = "copy";
+            btn.classList.remove("copied");
+          }, 1500);
+        };
+        const fallback = () => {
+          const ta = document.createElement("textarea");
+          ta.value = url;
+          ta.style.cssText = "position:fixed;top:-9999px;left:-9999px;";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          try {
+            document.execCommand("copy");
+          } catch (e) {}
+          document.body.removeChild(ta);
+          done();
+        };
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(done).catch(fallback);
+        } else {
+          fallback();
+        }
       }
 
       function closeEditCoModal() {
@@ -5857,17 +6402,25 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
           showToast(`${name} is already in your pipeline`);
           return;
         }
-        state.companies.push({
+        const newCo = {
           id: "co" + Math.random().toString(36).slice(2, 9),
           name,
           linkedinUrl: document.getElementById("ac-linkedin").value.trim(),
           careersUrl: document.getElementById("ac-careers").value.trim(),
           contact: document.getElementById("ac-contact").value.trim(),
-        });
+          jobs: [],
+          jobsStatus: "idle",
+          jobsLastFetched: null,
+        };
+        state.companies.push(newCo);
         trackActivity();
         saveState();
         closeAddCoModal();
         renderCompanies();
+        // Trigger job discovery in background if key is set
+        getFirecrawlKey().then((key) => {
+          if (key) discoverJobs(newCo.id);
+        });
       }
 
       async function openShareModal() {
