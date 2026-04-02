@@ -4701,7 +4701,11 @@ Output ONLY the raw SVG code starting with <svg, nothing else.`,
       async function maybeBackup() {
         const lastBackup = await idbGet("last-backup-date");
         const sixHours = 6 * 60 * 60 * 1000;
-        if (!lastBackup || Date.now() - lastBackup > sixHours)
+        if (
+          !lastBackup ||
+          typeof lastBackup !== "number" ||
+          Date.now() - lastBackup > sixHours
+        )
           await writeBackup();
       }
 
