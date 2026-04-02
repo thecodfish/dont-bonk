@@ -4054,14 +4054,15 @@
       // ── Job discovery via Firecrawl ────────────────────────
       function findJobBoardUrl(results) {
         const atsDomains = [
-          "ashbyhq.com",
+          "job-boards.greenhouse.io",
           "boards.greenhouse.io",
           "jobs.lever.co",
+          "jobs.ashbyhq.com",
+          "ashbyhq.com",
           "greenhouse.io",
           "lever.co",
           "workday.com",
           "myworkdayjobs.com",
-          "jobs.ashbyhq.com",
           "smartrecruiters.com",
           "careers.icims.com",
           "jobs.jobvite.com",
@@ -4106,7 +4107,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             appliedFacets: {},
-            limit: 20,
+            limit: 100,
             offset: 0,
             searchText: roleFilter || "",
           }),
@@ -4198,6 +4199,77 @@
         return Array.isArray(extracted.jobs) ? extracted.jobs : [];
       }
 
+      const ATS_DOMAINS = [
+        "job-boards.greenhouse.io",
+        "boards.greenhouse.io",
+        "greenhouse.io",
+        "jobs.lever.co",
+        "lever.co",
+        "myworkdayjobs.com",
+        "ashbyhq.com",
+        "jobs.ashbyhq.com",
+        "smartrecruiters.com",
+        "careers.icims.com",
+        "jobs.jobvite.com",
+        "apply.workable.com",
+      ];
+
+      async function findATSLinkInPage(key, url) {
+        try {
+          const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${key}`,
+            },
+            body: JSON.stringify({ url, formats: ["links"] }),
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          const links = data.data?.links || data.links || [];
+          for (const link of links) {
+            if (!link || typeof link !== "string") continue;
+            const resolved = new URL(link, url).href;
+            for (const domain of ATS_DOMAINS) {
+              if (resolved.includes(domain)) return resolved;
+            }
+          }
+        } catch {}
+        return null;
+      }
+
+      async function probeGreenhouseSlug(companyName, careersUrl) {
+        const slugs = [];
+        // From careersUrl hostname (e.g. "mavenclinic" from "mavenclinic.com")
+        try {
+          const host = new URL(careersUrl).hostname.replace(/^www\./, "");
+          slugs.push(host.split(".")[0].replace(/careers|jobs/gi, ""));
+        } catch {}
+        // From company name
+        const base = companyName
+          .replace(/\(.*?\)/g, "")
+          .trim()
+          .toLowerCase();
+        slugs.push(base.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+        slugs.push(base.replace(/[^a-z0-9]+/g, ""));
+        const seen = new Set();
+        for (const slug of slugs) {
+          if (!slug || seen.has(slug)) continue;
+          seen.add(slug);
+          try {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(
+              `https://boards-api.greenhouse.io/v1/boards/${slug}/jobs`,
+              { signal: controller.signal },
+            );
+            clearTimeout(timer);
+            if (res.ok) return `https://boards.greenhouse.io/${slug}`;
+          } catch {}
+        }
+        return null;
+      }
+
       async function firecrawlSearch(key, query, limit = 5) {
         const res = await fetch("https://api.firecrawl.dev/v1/search", {
           method: "POST",
@@ -4226,15 +4298,23 @@
         if (editCoId === coId) renderJobsInModal(co);
 
         try {
+          const roleFilter = await getJobRoleFilter();
+
           // Run URL discovery searches in parallel (only if careersUrl not already known)
           if (!co.careersUrl || !co.linkedinUrl) {
             const searches = [
               firecrawlSearch(
                 key,
-                `${co.name} jobs site:ashbyhq.com OR site:greenhouse.io OR site:lever.co OR site:workday.com OR site:myworkdayjobs.com`,
+                `${co.name} jobs site:job-boards.greenhouse.io OR site:boards.greenhouse.io OR site:jobs.lever.co OR site:ashbyhq.com OR site:myworkdayjobs.com`,
                 5,
               ),
-              firecrawlSearch(key, `${co.name} open positions jobs`, 5),
+              firecrawlSearch(
+                key,
+                roleFilter
+                  ? `${co.name} "${roleFilter}" jobs`
+                  : `${co.name} open positions jobs`,
+                5,
+              ),
             ];
             const liIdx = !co.linkedinUrl
               ? searches.push(
@@ -4247,7 +4327,13 @@
               : -1;
             const careersIdx = !co.careersUrl
               ? searches.push(
-                  firecrawlSearch(key, `${co.name} careers jobs`, 3),
+                  firecrawlSearch(
+                    key,
+                    roleFilter
+                      ? `${co.name} ${roleFilter} careers`
+                      : `${co.name} careers jobs`,
+                    3,
+                  ),
                 ) - 1
               : -1;
             const allResults = await Promise.all(searches);
@@ -4277,8 +4363,19 @@
             }
           }
 
+          // If careersUrl is a marketing page, scrape its links to find embedded ATS URL
+          if (detectATS(co.careersUrl) === "unknown") {
+            const atsLink = await findATSLinkInPage(key, co.careersUrl);
+            if (atsLink) co.careersUrl = atsLink;
+          }
+
+          // If still unknown, probe Greenhouse board API by slug variants
+          if (detectATS(co.careersUrl) === "unknown") {
+            const ghUrl = await probeGreenhouseSlug(co.name, co.careersUrl);
+            if (ghUrl) co.careersUrl = ghUrl;
+          }
+
           // Fetch jobs via ATS API or Firecrawl fallback
-          const roleFilter = await getJobRoleFilter();
           const ats = detectATS(co.careersUrl);
           let jobs;
           if (ats === "workday") {
